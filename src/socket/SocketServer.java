@@ -298,22 +298,19 @@ public class SocketServer implements ISocket, Runnable {
 			try {
 				document = builder.parse(dataFile);
 				root = document.getDocumentElement();
+				root.setAttribute("new_data", "yes");
 				
 				if (root.getAttribute("new_data").equals("no")) {
 					// we can safely overwrite the file.
 					document = builder.newDocument();
 					root = document.createElement("sensors");
-					
 					root.setAttribute("new_data", "yes");
 					document.appendChild(root);
 				}
-				
-				
 			} catch (SAXException | IOException e) {
 				e.printStackTrace();
 				document = builder.newDocument();
 				root = document.createElement("sensors");
-				
 				root.setAttribute("new_data", "yes");
 				document.appendChild(root);
 			}
@@ -322,11 +319,11 @@ public class SocketServer implements ISocket, Runnable {
 			// since the file isn't there already, we can create a new file and add new data.
 			document = builder.newDocument();
 			root = document.createElement("sensors");
-			
 			root.setAttribute("new_data", "yes");
 			document.appendChild(root);
 		}
 		
+		// since we are writing new data anyway..
 		
 		// adding elements.
 		// sensors.
@@ -358,6 +355,37 @@ public class SocketServer implements ISocket, Runnable {
 				smoke.appendChild(document.createTextNode(Integer.toString(fsd.getSmokeLevel())));
 				sensor.appendChild(smoke);
 				
+				// errors.
+				// All the errors tags(i.e: 4, one for each param) must be there,
+				// even if there is no error for that param.
+				// Otherwise down the line if we get a new error, XML Parser wont let us,
+				// add the error due to HIERARCHY_REQUEST_ERR.
+				Element errors = document.createElement("errors");
+				sensor.appendChild(errors);
+				
+				// error of each parameter of fire sensor is a child of errors.
+				fsd.validateAllParameters();
+				
+				Element error = document.createElement("error");
+				error.setAttribute("type", "temperature");
+				error.appendChild(document.createTextNode(fsd.getTempErr()));
+				errors.appendChild(error);
+				
+				error = document.createElement("error");
+				error.setAttribute("type", "battery");
+				error.appendChild(document.createTextNode(fsd.getBatteryErr()));
+				errors.appendChild(error);
+				
+				error = document.createElement("error");
+				error.setAttribute("type", "co2");
+				error.appendChild(document.createTextNode(fsd.getCo2Err()));
+				errors.appendChild(error);
+
+				error = document.createElement("error");
+				error.setAttribute("type", "smoke");
+				error.appendChild(document.createTextNode(fsd.getSmokeErr()));
+				errors.appendChild(error);
+			
 				fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.
 			}
 		}
@@ -367,7 +395,7 @@ public class SocketServer implements ISocket, Runnable {
 			TransformerFactory transformerFactory = TransformerFactory.newInstance();
 			Transformer transformer = transformerFactory.newTransformer();
 			DOMSource source = new DOMSource(document);
-			StreamResult target = new StreamResult(new File("./data.txt"));
+			StreamResult target = new StreamResult(dataFile);
 			
 			transformer.transform(source, target);
 		} catch (TransformerException e) {

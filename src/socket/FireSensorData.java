@@ -228,6 +228,21 @@ public class FireSensorData {
 		return validity;
 	}
 	
+	/*
+	 * This acts as sort of a facade which will call all the isSomethingBlaBla methods,
+	 * and that will result in error messaged being passed to their respective variables,
+	 * if any.
+	 * 
+	 * This way we can get any relevant error message(s) without having to run each isSomethingBlaBla method,
+	 * individually.
+	 */
+	public void validateAllParameters() {
+		isTemperatureInLevel();
+		isBatteryInLevel();
+		isCo2InLevel();
+		isSmokeInLevel();
+	}
+	
 	
 	// For testing whether data is passed from the client to the server properly.
 	// TODO Remove this method after all implementations are done.
