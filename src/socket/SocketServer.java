@@ -293,21 +293,37 @@ public class SocketServer implements ISocket, Runnable {
 		// we'll append new data if the file exists.
 		// if file exists, we need to initialize the root tag accordingly.
 		if (dataFile.exists()) {
+			// RMI server will set new_data attribute of the root element to "no" after reading.
+			// and to tell the RMI server that it should read data, Socket server(here) will set it to "yes".
 			try {
 				document = builder.parse(dataFile);
 				root = document.getDocumentElement();
-				System.out.println(root);
+				
+				if (root.getAttribute("new_data").equals("no")) {
+					// we can safely overwrite the file.
+					document = builder.newDocument();
+					root = document.createElement("sensors");
+					
+					root.setAttribute("new_data", "yes");
+					document.appendChild(root);
+				}
+				
 				
 			} catch (SAXException | IOException e) {
 				e.printStackTrace();
 				document = builder.newDocument();
 				root = document.createElement("sensors");
+				
+				root.setAttribute("new_data", "yes");
 				document.appendChild(root);
 			}
 		}
 		else {
+			// since the file isn't there already, we can create a new file and add new data.
 			document = builder.newDocument();
 			root = document.createElement("sensors");
+			
+			root.setAttribute("new_data", "yes");
 			document.appendChild(root);
 		}
 		
