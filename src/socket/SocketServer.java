@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
@@ -31,6 +32,19 @@ import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
 
 
 /*
@@ -75,7 +89,7 @@ public class SocketServer implements ISocket, Runnable {
 	private ObjectOutputStream serverDataOutput;
 
 	// File I/O properties.
-	File dataFile = new File("./data.txt");
+	File dataFile = new File("./data.xml");
 	BufferedReader reader;
 	PrintWriter writer;
 	
@@ -98,8 +112,8 @@ public class SocketServer implements ISocket, Runnable {
 		
 		// initiate file stream.
 		try {
-			reader = new BufferedReader(new FileReader(dataFile));
 			writer = new PrintWriter(dataFile);
+			reader = new BufferedReader(new FileReader(dataFile));
 		}
 		catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -210,6 +224,34 @@ public class SocketServer implements ISocket, Runnable {
 	 * Append new data if the RMI server hasn't read the previous data.
 	 */
 	public void writeToStorage() throws IOException {
+		
+		// init the xml file.
+		writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");	// back slashes will escape the characters.
+		writer.append("<sensors>");
+		
+		for (FireSensorData sensorData: sensorAndData.values()) {
+			if (!sensorData.alreadyWrittenToFile()) {
+				writer.append("<sensor id=\"" + sensorData.getSensorId() + "\">");
+			
+				writer.append("<temperature>" + sensorData.getTemperature() + "</temperature>");
+				
+				writer.append("</sensor>");
+				
+				/*String dataToWrite = sensorData.getSensorId() + " : " + 
+						   "T: " + sensorData.getTemperature() + "  " +
+						   "B: " + sensorData.getBatteryPercentage() + "  " +
+						   "CO2: " + sensorData.getCo2Level() + "  " +
+						   "S: " + sensorData.getSmokeLevel();
+		
+				System.err.println(dataToWrite);
+				writer.append(dataToWrite + "\n");	
+				*/
+				sensorData.setAlreadyWrittenToFile(true);
+			}
+		}
+		writer.append("</sensors>");
+		
+		/*
 		// initialize file.
 		reader = new BufferedReader(new FileReader(dataFile));	// to access the first line of the file always.
 		String firstLine = reader.readLine();
@@ -237,7 +279,89 @@ public class SocketServer implements ISocket, Runnable {
 		}
 		writer.append("END" + "\n");
 		writer.close();
+		*/
 	}
+	
+	
+	public void writeSensorDataToXml() throws ParserConfigurationException {
+		File dataFile = new File("./data.txt");
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder builder = factory.newDocumentBuilder();
+		Document document;
+		Element root;
+		
+		// we'll append new data if the file exists.
+		// if file exists, we need to initialize the root tag accordingly.
+		if (dataFile.exists()) {
+			try {
+				document = builder.parse(dataFile);
+				root = document.getDocumentElement();
+				System.out.println(root);
+				
+			} catch (SAXException | IOException e) {
+				e.printStackTrace();
+				document = builder.newDocument();
+				root = document.createElement("sensors");
+				document.appendChild(root);
+			}
+		}
+		else {
+			document = builder.newDocument();
+			root = document.createElement("sensors");
+			document.appendChild(root);
+		}
+		
+		
+		// adding elements.
+		// sensors.
+		for(FireSensorData fsd: sensorAndData.values()) {
+			// see if the data has already been written.
+			if (!fsd.alreadyWrittenToFile()) {
+				// sensor is a child of sensors.
+				Element sensor = document.createElement("sensor");
+				root.appendChild(sensor);
+				
+				// set sensor id.
+				sensor.setAttribute("id", fsd.getSensorId());	// <sensor id="23-13">
+				
+				// set other 4 params.
+				// they are children of the sensor.
+				Element temperature = document.createElement("temperature");
+				temperature.appendChild(document.createTextNode(Double.toString(fsd.getTemperature())));		// <temperature>43.4</temperature>
+				sensor.appendChild(temperature);		// because temperature is a child of sensor.
+				
+				Element battery = document.createElement("battery");
+				battery.appendChild(document.createTextNode(Integer.toString(fsd.getBatteryPercentage())));
+				sensor.appendChild(battery);
+				
+				Element co2 = document.createElement("co2");
+				co2.appendChild(document.createTextNode(Double.toString(fsd.getCo2Level())));
+				sensor.appendChild(co2);
+				
+				Element smoke = document.createElement("smoke");
+				smoke.appendChild(document.createTextNode(Integer.toString(fsd.getSmokeLevel())));
+				sensor.appendChild(smoke);
+				
+				fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.
+			}
+		}
+		
+		// write the data to .xml file.
+		try {
+			TransformerFactory transformerFactory = TransformerFactory.newInstance();
+			Transformer transformer = transformerFactory.newTransformer();
+			DOMSource source = new DOMSource(document);
+			StreamResult target = new StreamResult(new File("./data.txt"));
+			
+			transformer.transform(source, target);
+		} catch (TransformerException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+	}
+	
 	
 	
 	/*
@@ -301,7 +425,7 @@ public class SocketServer implements ISocket, Runnable {
 							
 						insertDataToServerHashMap(sensorId, fsd);
 						
-						writeToStorage();
+						writeSensorDataToXml();
 						// we need to notify the listeners about the new data.
 						// always get the data from the hashmap instead of transmitting the local variable.
 						//notifyMonitors(sensorAndData.get(sensorId));
