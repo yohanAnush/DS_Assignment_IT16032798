@@ -33,7 +33,7 @@ public class FireSensor {
 				// add the parameters and their readings to the hashmap first.
 				sensorData = new HashMap<>();
 
-				sensorData.put("sensorId", "01-22" + Integer.toString(count));
+				sensorData.put("sensorId", "01-2" + Integer.toString(count));
 				sensorData.put("temperature", "65.0");
 				sensorData.put("battery", "80");
 				sensorData.put("smoke", "8");

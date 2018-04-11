@@ -48,31 +48,15 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 		// so the Socket server can realize we have read the file.
 		BufferedReader reader;
 		PrintWriter writer;
+		String line;
 		try {
 			reader = new BufferedReader(new FileReader("./data.txt"));
-			String line;
 			while (true) {
-				line = reader.readLine();
-				
-				// if the current line is empty, go back the beginning of the file.
-				if (line != null && line.equals("END")) {
-					writer = new PrintWriter("./data.txt");
-					writer.write("READ");
-					writer.close();
-					
-					// re open the file to go the beginning.
-					reader = new BufferedReader(new FileReader("./data.txt"));
-				}
-				else if (line != null && !line.startsWith("READ")) {
-					// means the line now has the time stamp.
-					System.out.println(line);
+				if ((line = reader.readLine()) != null) {
 					notifyMonitors(line);
 				}
-				
-				
 			}
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -89,7 +73,6 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 			Thread t = new Thread(rmiServer);
 			t.start();
 		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
