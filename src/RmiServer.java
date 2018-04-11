@@ -1,6 +1,8 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
@@ -8,6 +10,21 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.jar.Attributes.Name;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 
@@ -35,6 +52,59 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 		}
 	}
 	
+	public void readXmlData() {
+		File dataFile = new File("./data.txt");
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		DocumentBuilder builder;
+		try {
+			builder = factory.newDocumentBuilder();
+			Document document;
+			Element root;
+			
+			if (dataFile.exists()) {
+				document = builder.parse(dataFile);
+				document.getDocumentElement().normalize();
+				root = document.getDocumentElement();
+				
+				if (root.getAttribute("new_data").equals("yes")) {
+					root.setAttribute("new_data", "no");
+					
+					NodeList nodes = document.getElementsByTagName("sensor");
+
+					for (int i = 0; i < nodes.getLength(); i++) {
+						// to access the inner elements of a node, we need to cast the node,
+						// to Element first.
+						Element sensor = (Element)nodes.item(i);
+						
+						// check if the element is really an element.
+						if (sensor.getNodeType() == Node.ELEMENT_NODE) {
+							notifyMonitors(sensor.getAttribute("id") + " : ");		//sensorId
+							
+							// print the other child elements.
+							NodeList childNodes = sensor.getChildNodes();
+							
+							for (int j = 0; j < childNodes.getLength(); j++) {
+								Element childElement = (Element)childNodes.item(j);
+								notifyMonitors(childElement.getTextContent() + "   ");
+							}
+							notifyMonitors("\n");
+						}
+					}
+					
+					// update the xml file so that the Socket server knows we read the file.
+					TransformerFactory transformerFactory = TransformerFactory.newInstance();
+					Transformer transformer = transformerFactory.newTransformer();
+					StreamResult target = new StreamResult(dataFile);
+					transformer.transform(new DOMSource(document), target);
+				}
+			}
+				
+				
+		} catch (ParserConfigurationException | IOException | SAXException | TransformerException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public void run() {
 		System.out.println("started");
 		try {
@@ -49,15 +119,9 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 		BufferedReader reader;
 		PrintWriter writer;
 		String line;
-		try {
-			reader = new BufferedReader(new FileReader("./data.txt"));
-			while (true) {
-				if ((line = reader.readLine()) != null) {
-					notifyMonitors(line);
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
+		
+		while(true) {
+			readXmlData();
 		}
 		
 	}

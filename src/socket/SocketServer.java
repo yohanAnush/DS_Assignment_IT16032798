@@ -214,74 +214,7 @@ public class SocketServer implements ISocket, Runnable {
 		
 	}
 	
-	/*
-	 * For RMI Server to be able to access data, we need to write to a file.
-	 * Once the data is written, set its alreadyWrittenToFile to true to avoid same data being duplicated.
-	 * 
-	 * Always erase the current content and write new content.
-	 * Add the timestamp to the file so the RMI server can identify if the file is new or not.
-	 *  
-	 * Append new data if the RMI server hasn't read the previous data.
-	 */
-	public void writeToStorage() throws IOException {
-		
-		// init the xml file.
-		writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");	// back slashes will escape the characters.
-		writer.append("<sensors>");
-		
-		for (FireSensorData sensorData: sensorAndData.values()) {
-			if (!sensorData.alreadyWrittenToFile()) {
-				writer.append("<sensor id=\"" + sensorData.getSensorId() + "\">");
-			
-				writer.append("<temperature>" + sensorData.getTemperature() + "</temperature>");
-				
-				writer.append("</sensor>");
-				
-				/*String dataToWrite = sensorData.getSensorId() + " : " + 
-						   "T: " + sensorData.getTemperature() + "  " +
-						   "B: " + sensorData.getBatteryPercentage() + "  " +
-						   "CO2: " + sensorData.getCo2Level() + "  " +
-						   "S: " + sensorData.getSmokeLevel();
-		
-				System.err.println(dataToWrite);
-				writer.append(dataToWrite + "\n");	
-				*/
-				sensorData.setAlreadyWrittenToFile(true);
-			}
-		}
-		writer.append("</sensors>");
-		
-		/*
-		// initialize file.
-		reader = new BufferedReader(new FileReader(dataFile));	// to access the first line of the file always.
-		String firstLine = reader.readLine();
-		System.out.println(firstLine);
-		
-		// check if it's already there.
-		if (!dataFile.exists()|| firstLine == null || firstLine.startsWith("READ")){
-			writer.write(Long.toString(System.currentTimeMillis()) + "\n");	// so the reader can identify whether the file is new or not.
-		}
-	
-		// writting data.
-		for (FireSensorData sensorData: sensorAndData.values()) {
-			if (!sensorData.alreadyWrittenToFile()) {
-				String dataToWrite = sensorData.getSensorId() + " : " + 
-						   "T: " + sensorData.getTemperature() + "  " +
-						   "B: " + sensorData.getBatteryPercentage() + "  " +
-						   "CO2: " + sensorData.getCo2Level() + "  " +
-						   "S: " + sensorData.getSmokeLevel();
-		
-				System.err.println(dataToWrite);
-				writer.append(dataToWrite + "\n");	
-				
-				sensorData.setAlreadyWrittenToFile(true);
-			}
-		}
-		writer.append("END" + "\n");
-		writer.close();
-		*/
-	}
-	
+
 	
 	public void writeSensorDataToXml() throws ParserConfigurationException {
 		File dataFile = new File("./data.txt");
@@ -289,16 +222,14 @@ public class SocketServer implements ISocket, Runnable {
 		DocumentBuilder builder = factory.newDocumentBuilder();
 		Document document;
 		Element root;
+	
 		
-		// we'll append new data if the file exists.
-		// if file exists, we need to initialize the root tag accordingly.
 		if (dataFile.exists()) {
 			// RMI server will set new_data attribute of the root element to "no" after reading.
 			// and to tell the RMI server that it should read data, Socket server(here) will set it to "yes".
 			try {
 				document = builder.parse(dataFile);
 				root = document.getDocumentElement();
-				root.setAttribute("new_data", "yes");
 				
 				if (root.getAttribute("new_data").equals("no")) {
 					// we can safely overwrite the file.
@@ -309,6 +240,7 @@ public class SocketServer implements ISocket, Runnable {
 				}
 			} catch (SAXException | IOException e) {
 				e.printStackTrace();
+				// if parsing fails, make a new file.
 				document = builder.newDocument();
 				root = document.createElement("sensors");
 				root.setAttribute("new_data", "yes");
@@ -443,7 +375,7 @@ public class SocketServer implements ISocket, Runnable {
 			try {
 				initSocketConnection(socket);
 				
-				HashMap<String, String> sensorDataAsHashMap;
+				//HashMap<String, String> sensorDataAsHashMap;
 				FireSensorData fsd;
 				String sensorId = "Unassigned Sensor Id";
 				lastUpdate = System.currentTimeMillis();
@@ -462,8 +394,8 @@ public class SocketServer implements ISocket, Runnable {
 						lastUpdate = System.currentTimeMillis();
 					}
 					
-					if ( (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {
-						fsd = new FireSensorData().getFireSensorDataFromHashMap(sensorDataAsHashMap);
+					if ((fsd = (FireSensorData)readSocketData()) != null  /*(sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null*/) {
+						//fsd = new FireSensorData().getFireSensorDataFromHashMap(sensorDataAsHashMap);
 						sensorId = fsd.getSensorId();
 						fsd.printData();
 							

@@ -4,10 +4,14 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.net.Socket;
 import java.util.HashMap;
 
+import socket.FireSensorData;
+
 public class FireSensor {
+	
 	private static ObjectOutputStream sensorDataOutput;
 	private static ObjectInputStream serverDataInput;
 	private static PrintWriter sensorTextOutput;
@@ -28,10 +32,10 @@ public class FireSensor {
 			HashMap<String, String> sensorData;
 			int count = 0; // for testing.
 			while (true) {
-				if (count > 0) {break;}	// for testing.
+				if (count > 2) {break;}	// for testing.
 				
 				// add the parameters and their readings to the hashmap first.
-				sensorData = new HashMap<>();
+				/*sensorData = new HashMap<>();
 
 				sensorData.put("sensorId", "01-2" + Integer.toString(count));
 				sensorData.put("temperature", "65.0");
@@ -42,7 +46,16 @@ public class FireSensor {
 				// let the server know data is ready to be read through its ObjectInputStream;
 				//sensorTextOutput.println("23-41");
 				// send the data to the server
-				sensorDataOutput.writeObject(sensorData);
+				 */
+				FireSensorData fsd = new FireSensorData();
+				
+				fsd.setSensorId("21-2" + count);
+				fsd.setTemperature(76.0);
+				fsd.setBatteryPercentage(90);
+				fsd.setCo2Level(300);
+				fsd.setSmokeLevel(4);
+				
+				sensorDataOutput.writeObject(fsd);
 			
 				count++;
 				

@@ -22,8 +22,12 @@ import org.w3c.dom.Document;
  *  The above parameters should be stored, and validated for their correctness and checked for,
  *  dangerous levels/values and notify the server right away as well.
  */
-public class FireSensorData {
+public class FireSensorData implements Serializable {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 2218262302825784339L;
 	private String sensorId;
 	private double temperature;
 	private int batteryPercentage;
