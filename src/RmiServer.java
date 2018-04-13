@@ -1,16 +1,10 @@
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
-import java.util.jar.Attributes.Name;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -27,29 +21,18 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
+@SuppressWarnings("serial")
+public class RmiServer extends UnicastRemoteObject implements FireAlarmDataService, Runnable {
 
+	private int sensorCount = 0;	// we can get this simply by counting nodes in the XML file(given that we are reading the current.txt file).
 	private static ArrayList<IListener> monitors = new ArrayList<>();
-	
 	public RmiServer() throws RemoteException {}
 	
 	public int getSensorCount() throws RemoteException {
-		int count = -1;
+
+		readXmlData(new File("./current.txt"), true);
 		
-		try {
-			BufferedReader reader = new BufferedReader(new FileReader("./stats.txt"));
-			String line = reader.readLine();
-			
-			if (line != null) {
-				count = Integer.parseInt(line);
-			}
-			reader.close();
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		return count;
+		return this.sensorCount;
 	}
 	
 	public int getMonitorCount() throws RemoteException {
@@ -64,13 +47,41 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 		monitors.remove(monitor);
 	}
 	
-	public void notifyMonitors(String data) throws RemoteException {
+	/*
+	 * We send 3 types of data to the monitors( well actually two).
+	 * 		Sensor readings
+	 * 		Monitor count
+	 * 		Sensor count
+	 * 
+	 * Therefore, depending on data type we need to call the relevant method of the monitor.
+	 */
+	public void notifyMonitors(String data, String dataType) throws RemoteException {
+		
 		for(IListener monitor: monitors) {
-			monitor.onData(data);
+			switch (dataType) {
+			case "data":	monitor.onData(data);
+						    break;
+						    
+			case "monitor_count":	monitor.onMonitorChange(Integer.parseInt(data));
+									break;
+									
+			case "sensor_count":	monitor.onSensorChnange(Integer.parseInt(data));
+									break;
+				
+			}
 		}
 	}
 	
-	public void readXmlData(File dataFile) {
+	
+	public String getAllReadings() throws RemoteException {
+		String data = readXmlData(new File("./data.txt"), false);
+		System.err.println(data);
+		
+		return data;
+	}
+	
+	public String readXmlData(File dataFile, boolean countNumOfSensors) {
+		String data = "";
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder builder;
 		try {
@@ -87,7 +98,6 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 					root.setAttribute("new_data", "no");
 					
 					NodeList nodes = document.getElementsByTagName("sensor");
-
 					for (int i = 0; i < nodes.getLength(); i++) {
 						// to access the inner elements of a node, we need to cast the node,
 						// to Element first.
@@ -95,17 +105,24 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 						
 						// check if the element is really an element.
 						if (sensor.getNodeType() == Node.ELEMENT_NODE) {
-							notifyMonitors(sensor.getAttribute("id") + " : ");		//sensorId
+							data += sensor.getAttribute("id") + " : ";		//sensorId
 							
 							// print the other child elements.
 							NodeList childNodes = sensor.getChildNodes();
 							
 							for (int j = 0; j < childNodes.getLength(); j++) {
 								Element childElement = (Element)childNodes.item(j);
-								notifyMonitors(childElement.getTextContent() + "   ");
+								data += "  " + childElement.getTextContent() + "   ";
 							}
-							notifyMonitors("\n");
+							//notifyMonitors("\n");
+							data += "\n";
 						}
+					}
+					
+					// if we are reading the current.txt file(which has readings of each sensor),
+					// we can get the sensor count by counting the number of child nodes in the file.
+					if (countNumOfSensors) {
+						this.sensorCount = nodes.getLength();
 					}
 					
 					// update the xml file so that the Socket server knows we read the file.
@@ -118,27 +135,34 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 				
 				
 		} catch (ParserConfigurationException | IOException | SAXException | TransformerException e) {
-			e.printStackTrace();
+			data = null;
 		}
+		
+		return data;
 	}
 	
 	public void run() {
-		System.out.println("started");
-		try {
-			Thread.sleep(600);
-		} catch (InterruptedException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		System.out.println("Reseumed");
-		// keep reading the data file. Once read, write "READ" to the file,
-		// so the Socket server can realize we have read the file.
-		BufferedReader reader;
-		PrintWriter writer;
-		String line;
+		System.out.println("RMI Server started..");
 		
 		while(true) {
-			readXmlData(new File("./data.txt"));
+			String data;
+			try {
+				// current readings.
+				if ((data =readXmlData(new File("./data.txt"), false)) != null) {
+					notifyMonitors(data, "data");
+					
+					// sensor and monitor counts.
+					// we get the sensor count by reading current.txt where the reading method assigns the count.
+					readXmlData(new File("./current.txt"), true);
+					notifyMonitors(Integer.toString(this.sensorCount), "sensor_count");
+					notifyMonitors(Integer.toString(monitors.size()), "monitor_count");
+				}
+			}
+			catch (RemoteException e) {
+				continue;
+			}
+
+			
 		}
 		
 	}

@@ -1,57 +1,39 @@
 package sensor;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
-import java.io.Serializable;
-import java.net.Socket;
 import java.util.HashMap;
 
-import socket.FireSensorData;
-
-public class FireSensor {
-	
-	private static ObjectOutputStream sensorDataOutput;
-	private static ObjectInputStream serverDataInput;
-	private static PrintWriter sensorTextOutput;
-	
+public class FireSensor extends Sensor {
 	
 	// TODO mimic the procedure of the sensor getting data by using a file.
-	public static void main(String[] main) {
-		String server = "localhost";
-		Socket socket = null;
-		try {
-			socket = new Socket(server, 9001);
-			sensorDataOutput = new ObjectOutputStream(socket.getOutputStream());
-			serverDataInput = new ObjectInputStream(socket.getInputStream());
-			sensorTextOutput = new PrintWriter(socket.getOutputStream(), true);
-			
-			// send to the server
-			// TODO Send to the server according to the specifications.
-			HashMap<String, String> sensorData;
-			int count = 0; // for testing.
-			while (true) {
-				if (count > 2) {break;}	// for testing.
-				
-				// add the parameters and their readings to the hashmap first.
-				sensorData = new HashMap<>();
+	public static void main(String[] main) throws InterruptedException {
+		FireSensor sensor = new FireSensor();
+		Randoms random = new Randoms();
+		String sensorId = random.getRandomInt(1, 23) + "-" + random.getRandomInt(1, 13);		// we assume there are 23 floors and 13 sensors per floor.
+		HashMap<String, String> data;
+		
+		sensor.connectToServer("localhost", 9001);
 
-				sensorData.put("sensorId", "01-2" + Integer.toString(count));
-				sensorData.put("temperature", "65.0");
-				sensorData.put("battery", "80");
-				sensorData.put("smoke", "8");
-				sensorData.put("co2", "301.0");
-
-				sensorDataOutput.writeObject(sensorData);
+		while (sensor.isConnected()) {	
+			// always reinitialize the hash map or same data will be sent to the server always.
+			data = new HashMap<>();
+		
+			data.put("sensorId", sensorId);		
+			data.put("temperature", Double.toString((random.getRandomDouble(20.0, 90.0))));
+			data.put("battery", Integer.toString((random.getRandomInt(1, 100))));
+			data.put("co2", Double.toString((random.getRandomDouble(300, 301))));
+			data.put("smoke", Integer.toString((random.getRandomInt(0, 10))));
 			
-				count++;
-				
-				Thread.sleep(5000);
+			// we only send data to the server at 1 hour intervals.
+			// 0 indicates the sensor never wrote to the server, so we have to do an intial write.
+			// all the consecutive writes will happen when the last update exceeds one hour compared to current time.
+			// write object method will take care of managing the last update time.
+			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 3600000) {
+				sensor.writeObject(data);
 			}
-		}
-		catch (IOException | InterruptedException e) {
-			e.printStackTrace();
+			
+			new Thread();
+			// to emulate readings being taken every 5 mins:-
+			Thread.sleep(300000);
 		}
 	}
 }

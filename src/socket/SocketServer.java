@@ -1,36 +1,17 @@
 package socket;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
-import java.io.Serializable;
-import java.io.Writer;
-import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.rmi.AlreadyBoundException;
-import java.rmi.Naming;
-import java.rmi.NotBoundException;
-import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
-import java.sql.Time;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -56,7 +37,7 @@ import org.xml.sax.SAXException;
  *  RMI is used to let the monitors know about the current state of information.
  *  
  */
-public class SocketServer implements ISocket, Runnable {
+public class SocketServer implements Runnable {
 
 	// server config.
 	private static final int PORT_TO_LISTEN = 9001;
@@ -76,7 +57,8 @@ public class SocketServer implements ISocket, Runnable {
 
 	// Socket Connection properties.
 	private Socket socket;
-	private BufferedReader sensorTextInput;	// gives sort of a heads-up before sending the actual data via object output stream.
+	@SuppressWarnings("unused")
+	private BufferedReader sensorTextInput;
 	private ObjectInputStream sensorDataInput;	// this will delivery a hash map where a key can be 1 of the 4 parameters.
 											// and the value relevent to the parameter is the object assigned to the key.
 											// both the key and the object/value are Strings (Parse as needed).
@@ -210,29 +192,11 @@ public class SocketServer implements ISocket, Runnable {
 			// new data and write to the file.
 			fireSensorData.setAlreadyWrittenToFile(false);
 			sensorAndData.put(sensorId, fireSensorData);
-			
-			// for RMI server's usage.
-			writeSensorCountToFile(new File("./stats.txt"));
 		}
 		
 	}
-	
-	/*
-	 * Writes the current number of sensors to a text file,
-	 * NO XML here, just plain text.
-	 * 
-	 * Must be called when a sensor is connected as well as when a sensor disconnects.
-	 */
-	public void writeSensorCountToFile(File dataFile) {
-		try {
-			PrintWriter writer = new PrintWriter(new FileWriter(dataFile));
-			writer.write(sensorAndData.size());
-			writer.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
+
+		
 	/*
 	 * This method is kinda tricky,even though we iterate through the whole HashMap that contains,
 	 * data from all the sensors, we skip the sensors whose data has previously being written and there,
@@ -262,6 +226,7 @@ public class SocketServer implements ISocket, Runnable {
 					document = builder.newDocument();
 					root = document.createElement("sensors");
 					root.setAttribute("new_data", "yes");
+					document.appendChild(root);
 				}
 			} catch (SAXException | IOException e) {
 				e.printStackTrace();
@@ -269,6 +234,7 @@ public class SocketServer implements ISocket, Runnable {
 				document = builder.newDocument();
 				root = document.createElement("sensors");
 				root.setAttribute("new_data", "yes");
+				document.appendChild(root);
 			}
 		}
 		else {
@@ -276,10 +242,9 @@ public class SocketServer implements ISocket, Runnable {
 			document = builder.newDocument();
 			root = document.createElement("sensors");
 			root.setAttribute("new_data", "yes");
+			document.appendChild(root);
 		}
 		
-		root.setAttribute("count", Integer.toString(sensorAndData.size()));
-		document.appendChild(root);
 		
 		// since we are writing new data anyway..
 		
@@ -299,7 +264,7 @@ public class SocketServer implements ISocket, Runnable {
 				
 				// set other 4 params.
 				// they are children of the sensor.
-				HashMap<String, String> dataHashMap = fsd.getHashMap();	// this way we can iterate instead of coding for each paramter.
+				HashMap<String, String> dataHashMap = fsd.getParamHashMap();	// this way we can iterate instead of coding for each paramter.
 				for (String param: dataHashMap.keySet()) {
 					Element paramElement = document.createElement(param);
 					paramElement.appendChild(document.createTextNode(dataHashMap.get(param)));		// <temperature>43.4</temperature>
@@ -316,7 +281,7 @@ public class SocketServer implements ISocket, Runnable {
 				
 				// error of each parameter of fire sensor is a child of errors.
 				fsd.validateAllParameters();
-				for (String error: fsd.getErrorsList()) {
+				for (String error: fsd.getSensorErrors()) {
 					Element errorElement = document.createElement("error");
 					errorElement.appendChild(document.createTextNode(error));
 					errors.appendChild(errorElement);
@@ -355,7 +320,6 @@ public class SocketServer implements ISocket, Runnable {
 	
 	/* * * Each ServerInstance is simple an unique instance of FireAlarmServer with a couple of data handling parameters. * * */
 	private String sensorId;
-	private FireSensorData fireSensorData;
 	private long lastUpdate;	// using Time() we can get the difference easily.
 	
 	
@@ -383,7 +347,7 @@ public class SocketServer implements ISocket, Runnable {
 				initSocketConnection(socket);
 				
 				HashMap<String, String> sensorDataAsHashMap;
-				FireSensorData fsd = new FireSensorData();
+				FireSensorData fsd = null;
 				String sensorId = "Unassigned Sensor Id";
 				lastUpdate = System.currentTimeMillis();
 				
@@ -393,41 +357,25 @@ public class SocketServer implements ISocket, Runnable {
 					
 					// Monitors should be notified if the sensor's last update exceeds one hour.
 					// 1 hour = 3.6e+6 millis. 
-					if ((System.currentTimeMillis() - lastUpdate) > 	600) {
-						//notifyMonitors(sensorId + " has not reported in 1 hour.");
+					if ((System.currentTimeMillis() - lastUpdate) > 600 && fsd != null) {
+						fsd.setUnreportedErr(sensorId + " has not reported in 1 hour.");
+						fsd.setAlreadyWrittenToFile(false);		// otherwise writting method will ignore the sensor.
+						writeSensorDataToXml(new File("./data.txt"), false);		// for rmi server to read latest data.
+						writeSensorDataToXml(new File("./current.txt"), true); 	// if the rmi server wants data of all the connected sensors.
 						
 						// Don't remove the following code as it will result in a non-stop loop until data arrives.
 						// Sending the warning once and then waiting another 1 hour will suffice.
 						lastUpdate = System.currentTimeMillis();
 					}
 					
-					if (/*(fsd = (FireSensorData)readSocketData()) != null*/  (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {
-						//fsd = new FireSensorData().getFireSensorDataFromHashMap(sensorDataAsHashMap);
-						fsd = fsd.getFireSensorDataFromHashMap(sensorDataAsHashMap);
+					if ( (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {
+						fsd = new FireSensorData(sensorDataAsHashMap);
 						sensorId = fsd.getSensorId();
 						
 						fsd.printData();	
 						insertDataToServerHashMap(sensorId, fsd);
 						writeSensorDataToXml(new File("./data.txt"), false);		// for rmi server to read latest data.
 						writeSensorDataToXml(new File("./current.txt"), true); 	// if the rmi server wants data of all the connected sensors.
-						
-						// we need to notify the listeners about the new data.
-						// always get the data from the hashmap instead of transmitting the local variable.
-						//notifyMonitors(sensorAndData.get(sensorId));
-						
-						// check for errors and send error messages.
-						if (!fsd.isTemperatureInLevel()) {
-							//notifyMonitors(fsd.getTempErr());
-						}
-						if (!fsd.isBatteryInLevel()) {
-							//notifyMonitors(fsd.getBatteryErr());
-						}
-						if (!fsd.isSmokeInLevel()) {
-							//notifyMonitors(fsd.getSmokeErr());
-						}
-						if (!fsd.isCo2InLevel()) {
-							//notifyMonitors(fsd.getCo2Err());
-						}
 						
 						// coming upto this points indicates that the sensor sent data,
 						// hence we can set the last update to the current time.
@@ -445,8 +393,6 @@ public class SocketServer implements ISocket, Runnable {
 				// therefore remove the sensor and its data.
 				if (sensorId != null) {
 					sensorAndData.remove(sensorId);
-					
-					writeSensorCountToFile(new File("./stats.txt"));
 				}
 				
 				// close the connection.

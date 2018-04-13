@@ -1,15 +1,8 @@
 package socket;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.dom.DOMSource;
-
-import org.w3c.dom.Document;
 
 /*
  * This class will act as a helper class to the server to manage sensor data.
@@ -22,12 +15,12 @@ import org.w3c.dom.Document;
  *  The above parameters should be stored, and validated for their correctness and checked for,
  *  dangerous levels/values and notify the server right away as well.
  */
-public class FireSensorData implements Serializable {
-	
+public class FireSensorData implements Serializable{
+
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 2218262302825784339L;
+	private static final long serialVersionUID = 7017869631053371767L;
 	private String sensorId;
 	private double temperature;
 	private int batteryPercentage;
@@ -39,10 +32,16 @@ public class FireSensorData implements Serializable {
 	private String batteryErr = "";
 	private String smokeErr = "";
 	private String co2Err = "";
+	private String unreported = "";
 	
 	// for data passing via a file.
 	private boolean alreadyWrittenToFile = false;	// set this to true when the data is written to file.
 	
+	
+	public FireSensorData(HashMap<String, String> data) {
+		getFireSensorDataFromHashMap(data);
+		// this method initializes the parameters anyways.
+	}
 	
 	// Getters.
 	public String getSensorId() {
@@ -85,6 +84,9 @@ public class FireSensorData implements Serializable {
 		return co2Err;
 	}
 
+	public String getUnreportedErr() {
+		return unreported;
+	}
 	
 	
 	/* 
@@ -130,6 +132,10 @@ public class FireSensorData implements Serializable {
 	public void setCo2Err(String co2Err) {
 		this.co2Err = co2Err;
 	}
+	
+	public void setUnreportedErr(String unreported) {
+		this.unreported = unreported;
+	}
 
 	// Data is sent from the fire sensor as a hashmap, encoded as follows.
 	// 		Ex: "temp", "45.0"
@@ -143,22 +149,29 @@ public class FireSensorData implements Serializable {
 		return this;
 	}
 	
-	public HashMap<String, String> getHashMap() {
-		HashMap<String, String> dataHashMap = new HashMap<>();
+	/* 
+	 * Returns the 4 parameters of the sensor as a hash map with the parameter name keyed against its value.
+	 */
+	public HashMap<String, String> getParamHashMap() {
+		HashMap<String, String> data = new HashMap<>();
 		
-		dataHashMap.put("temperature", Double.toString(getTemperature()));
-		dataHashMap.put("battery", Integer.toString(getBatteryPercentage()));
-		dataHashMap.put("smoke", Integer.toString(getSmokeLevel()));
-		dataHashMap.put("co2", Double.toString(getCo2Level()));
+		data.put("temperature", Double.toString(getTemperature()));
+		data.put("battery", Integer.toString(getBatteryPercentage()));
+		data.put("smoke", Integer.toString(getSmokeLevel()));
+		data.put("co2", Double.toString(getCo2Level()));
 		
-		return dataHashMap;
+		return data;
 	}
 	
-	public String [] getErrorsList() {
-		String [] errors = {getTempErr(), getBatteryErr(), getSmokeErr(), getCo2Err()};
+	public String[] getSensorErrors() {
+		
+		// we must validate before getting the errors since errors will only be assigned after the values are validated.
+		validateAllParameters();
+		
+		String [] errors = {getTempErr(), getBatteryErr(), getSmokeErr(), getCo2Err(), getUnreportedErr()};
+		
 		return errors;
 	}
-	
 	
 	/* 
 	 * Validators.
@@ -181,11 +194,11 @@ public class FireSensorData implements Serializable {
 		
 		if (this.temperature < -273.15) {
 			validity = false;
-			setTempErr(this.sensorId + " : Sensor is malfunctioning; A temperature of " + this.temperature + " celcius is below absolute zero.");
+			setTempErr("Sensor is malfunctioning; A temperature of " + this.temperature + " celcius is below absolute zero.");
 		}
 		else if (this.temperature > 50.0) {
 			validity = false;
-			setTempErr(this.sensorId + " : Temperature is reaching a dangerous level at " + this.temperature + " celcius.");
+			setTempErr("Temperature is reaching a dangerous level at " + this.temperature + " celcius.");
 		}
 		
 		return validity;
@@ -200,12 +213,12 @@ public class FireSensorData implements Serializable {
 		setBatteryErr("");
 		if (this.batteryPercentage > 100 || this.batteryPercentage < 0) {
 			validity = false;
-			setBatteryErr(this.sensorId + " : Battery malfunction.");
+			setBatteryErr("Battery malfunction.");
 		}
 		
 		else if (this.batteryPercentage <= 30) {
 			validity = false;
-			setBatteryErr(this.sensorId + " : Battery low!");
+			setBatteryErr("Battery low!");
 		}
 
 		return validity;
@@ -220,12 +233,12 @@ public class FireSensorData implements Serializable {
 		setSmokeErr("");
 		
 		if (this.smokeLevel < 1 || this.smokeLevel > 10) {
-			setSmokeErr(this.sensorId + " : Smoke sensor malfunction.");
+			setSmokeErr("Smoke sensor malfunction.");
 			validity = false;
 		}
 		
 		else if (this.smokeLevel > 7) {
-			setSmokeErr(this.sensorId + " : Smoke level is at a dangerous level of " + this.smokeLevel);
+			setSmokeErr("Smoke level is at a dangerous level of " + this.smokeLevel);
 			validity = false;
 		}
 		
@@ -241,7 +254,7 @@ public class FireSensorData implements Serializable {
 		setCo2Err("");
 		
 		if (this.co2Level != 300.0) {
-			setCo2Err(this.sensorId + " : CO2 level is at a dangerous level of " + this.co2Level);
+			setCo2Err("CO2 level is at a dangerous level of " + this.co2Level);
 			validity = false;
 		}
 		
@@ -272,5 +285,13 @@ public class FireSensorData implements Serializable {
 		System.out.println("Battery : " + this.batteryPercentage);
 		System.out.println("Smoke   : " + this.smokeLevel);
 		System.out.println("CO2     : " + this.co2Level);
+	}
+	
+	public String getParamString() {
+		return this.sensorId + ":  " +
+			   "Temps: " + this.temperature + "   " +
+			   "Battery: " + this.batteryPercentage + "   " +
+			   "Smoke: " + this.smokeLevel + "   " +
+			   "CO2: " + this.co2Level + "\n";
 	}
 }
