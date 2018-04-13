@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
@@ -32,9 +33,27 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 	
 	public RmiServer() throws RemoteException {}
 	
-	public ArrayList<String> getConnectedSensors() throws RemoteException {
+	public int getSensorCount() throws RemoteException {
+		int count = -1;
 		
-		return new ArrayList<>();
+		try {
+			BufferedReader reader = new BufferedReader(new FileReader("./stats.txt"));
+			String line = reader.readLine();
+			
+			if (line != null) {
+				count = Integer.parseInt(line);
+			}
+			reader.close();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return count;
+	}
+	
+	public int getMonitorCount() throws RemoteException {
+		return monitors.size();
 	}
 	
 	public void addMonitor(IListener monitor) throws RemoteException {
@@ -46,14 +65,12 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 	}
 	
 	public void notifyMonitors(String data) throws RemoteException {
-		
 		for(IListener monitor: monitors) {
 			monitor.onData(data);
 		}
 	}
 	
-	public void readXmlData() {
-		File dataFile = new File("./data.txt");
+	public void readXmlData(File dataFile) {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder builder;
 		try {
@@ -121,7 +138,7 @@ public class RmiServer extends UnicastRemoteObject implements IRmi, Runnable {
 		String line;
 		
 		while(true) {
-			readXmlData();
+			readXmlData(new File("./data.txt"));
 		}
 		
 	}

@@ -143,6 +143,22 @@ public class FireSensorData implements Serializable {
 		return this;
 	}
 	
+	public HashMap<String, String> getHashMap() {
+		HashMap<String, String> dataHashMap = new HashMap<>();
+		
+		dataHashMap.put("temperature", Double.toString(getTemperature()));
+		dataHashMap.put("battery", Integer.toString(getBatteryPercentage()));
+		dataHashMap.put("smoke", Integer.toString(getSmokeLevel()));
+		dataHashMap.put("co2", Double.toString(getCo2Level()));
+		
+		return dataHashMap;
+	}
+	
+	public String [] getErrorsList() {
+		String [] errors = {getTempErr(), getBatteryErr(), getSmokeErr(), getCo2Err()};
+		return errors;
+	}
+	
 	
 	/* 
 	 * Validators.

@@ -210,14 +210,39 @@ public class SocketServer implements ISocket, Runnable {
 			// new data and write to the file.
 			fireSensorData.setAlreadyWrittenToFile(false);
 			sensorAndData.put(sensorId, fireSensorData);
+			
+			// for RMI server's usage.
+			writeSensorCountToFile(new File("./stats.txt"));
 		}
 		
 	}
 	
-
+	/*
+	 * Writes the current number of sensors to a text file,
+	 * NO XML here, just plain text.
+	 * 
+	 * Must be called when a sensor is connected as well as when a sensor disconnects.
+	 */
+	public void writeSensorCountToFile(File dataFile) {
+		try {
+			PrintWriter writer = new PrintWriter(new FileWriter(dataFile));
+			writer.write(sensorAndData.size());
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 	
-	public void writeSensorDataToXml() throws ParserConfigurationException {
-		File dataFile = new File("./data.txt");
+	/*
+	 * This method is kinda tricky,even though we iterate through the whole HashMap that contains,
+	 * data from all the sensors, we skip the sensors whose data has previously being written and there,
+	 * has not been any update since the last write.
+	 * 
+	 * But, we need to able to provide the data of all the sensors if the RMI server requires so. 
+	 */
+	public void writeSensorDataToXml(File dataFile, boolean coverAllSensors) throws ParserConfigurationException {
+		// we use data.txt file to write/append new data,
+		// and current.txt file to write all the data of all the sensors.
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder builder = factory.newDocumentBuilder();
 		Document document;
@@ -231,12 +256,12 @@ public class SocketServer implements ISocket, Runnable {
 				document = builder.parse(dataFile);
 				root = document.getDocumentElement();
 				
-				if (root.getAttribute("new_data").equals("no")) {
+				// if we are to cover all the sensors, we might as well overwrite the existing file anyways.
+				if (root.getAttribute("new_data").equals("no") || coverAllSensors) {
 					// we can safely overwrite the file.
 					document = builder.newDocument();
 					root = document.createElement("sensors");
 					root.setAttribute("new_data", "yes");
-					document.appendChild(root);
 				}
 			} catch (SAXException | IOException e) {
 				e.printStackTrace();
@@ -244,7 +269,6 @@ public class SocketServer implements ISocket, Runnable {
 				document = builder.newDocument();
 				root = document.createElement("sensors");
 				root.setAttribute("new_data", "yes");
-				document.appendChild(root);
 			}
 		}
 		else {
@@ -252,8 +276,10 @@ public class SocketServer implements ISocket, Runnable {
 			document = builder.newDocument();
 			root = document.createElement("sensors");
 			root.setAttribute("new_data", "yes");
-			document.appendChild(root);
 		}
+		
+		root.setAttribute("count", Integer.toString(sensorAndData.size()));
+		document.appendChild(root);
 		
 		// since we are writing new data anyway..
 		
@@ -261,7 +287,9 @@ public class SocketServer implements ISocket, Runnable {
 		// sensors.
 		for(FireSensorData fsd: sensorAndData.values()) {
 			// see if the data has already been written.
-			if (!fsd.alreadyWrittenToFile()) {
+			// TODO check if we are supposed to cover all the sensors, in which case we don't check if the data,
+			//		is already written or not.
+			if (coverAllSensors || !fsd.alreadyWrittenToFile()) {
 				// sensor is a child of sensors.
 				Element sensor = document.createElement("sensor");
 				root.appendChild(sensor);
@@ -271,21 +299,12 @@ public class SocketServer implements ISocket, Runnable {
 				
 				// set other 4 params.
 				// they are children of the sensor.
-				Element temperature = document.createElement("temperature");
-				temperature.appendChild(document.createTextNode(Double.toString(fsd.getTemperature())));		// <temperature>43.4</temperature>
-				sensor.appendChild(temperature);		// because temperature is a child of sensor.
-				
-				Element battery = document.createElement("battery");
-				battery.appendChild(document.createTextNode(Integer.toString(fsd.getBatteryPercentage())));
-				sensor.appendChild(battery);
-				
-				Element co2 = document.createElement("co2");
-				co2.appendChild(document.createTextNode(Double.toString(fsd.getCo2Level())));
-				sensor.appendChild(co2);
-				
-				Element smoke = document.createElement("smoke");
-				smoke.appendChild(document.createTextNode(Integer.toString(fsd.getSmokeLevel())));
-				sensor.appendChild(smoke);
+				HashMap<String, String> dataHashMap = fsd.getHashMap();	// this way we can iterate instead of coding for each paramter.
+				for (String param: dataHashMap.keySet()) {
+					Element paramElement = document.createElement(param);
+					paramElement.appendChild(document.createTextNode(dataHashMap.get(param)));		// <temperature>43.4</temperature>
+					sensor.appendChild(paramElement);		// because temperature is a child of sensor.
+				}
 				
 				// errors.
 				// All the errors tags(i.e: 4, one for each param) must be there,
@@ -297,28 +316,16 @@ public class SocketServer implements ISocket, Runnable {
 				
 				// error of each parameter of fire sensor is a child of errors.
 				fsd.validateAllParameters();
+				for (String error: fsd.getErrorsList()) {
+					Element errorElement = document.createElement("error");
+					errorElement.appendChild(document.createTextNode(error));
+					errors.appendChild(errorElement);
+				}
 				
-				Element error = document.createElement("error");
-				error.setAttribute("type", "temperature");
-				error.appendChild(document.createTextNode(fsd.getTempErr()));
-				errors.appendChild(error);
-				
-				error = document.createElement("error");
-				error.setAttribute("type", "battery");
-				error.appendChild(document.createTextNode(fsd.getBatteryErr()));
-				errors.appendChild(error);
-				
-				error = document.createElement("error");
-				error.setAttribute("type", "co2");
-				error.appendChild(document.createTextNode(fsd.getCo2Err()));
-				errors.appendChild(error);
-
-				error = document.createElement("error");
-				error.setAttribute("type", "smoke");
-				error.appendChild(document.createTextNode(fsd.getSmokeErr()));
-				errors.appendChild(error);
-			
-				fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.
+				// if we are not covering all the sensors we need to mark the data as already written.
+				if (!coverAllSensors) {
+					fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.
+				}
 			}
 		}
 		
@@ -375,8 +382,8 @@ public class SocketServer implements ISocket, Runnable {
 			try {
 				initSocketConnection(socket);
 				
-				//HashMap<String, String> sensorDataAsHashMap;
-				FireSensorData fsd;
+				HashMap<String, String> sensorDataAsHashMap;
+				FireSensorData fsd = new FireSensorData();
 				String sensorId = "Unassigned Sensor Id";
 				lastUpdate = System.currentTimeMillis();
 				
@@ -394,14 +401,16 @@ public class SocketServer implements ISocket, Runnable {
 						lastUpdate = System.currentTimeMillis();
 					}
 					
-					if ((fsd = (FireSensorData)readSocketData()) != null  /*(sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null*/) {
+					if (/*(fsd = (FireSensorData)readSocketData()) != null*/  (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {
 						//fsd = new FireSensorData().getFireSensorDataFromHashMap(sensorDataAsHashMap);
+						fsd = fsd.getFireSensorDataFromHashMap(sensorDataAsHashMap);
 						sensorId = fsd.getSensorId();
-						fsd.printData();
-							
-						insertDataToServerHashMap(sensorId, fsd);
 						
-						writeSensorDataToXml();
+						fsd.printData();	
+						insertDataToServerHashMap(sensorId, fsd);
+						writeSensorDataToXml(new File("./data.txt"), false);		// for rmi server to read latest data.
+						writeSensorDataToXml(new File("./current.txt"), true); 	// if the rmi server wants data of all the connected sensors.
+						
 						// we need to notify the listeners about the new data.
 						// always get the data from the hashmap instead of transmitting the local variable.
 						//notifyMonitors(sensorAndData.get(sensorId));
@@ -436,6 +445,8 @@ public class SocketServer implements ISocket, Runnable {
 				// therefore remove the sensor and its data.
 				if (sensorId != null) {
 					sensorAndData.remove(sensorId);
+					
+					writeSensorCountToFile(new File("./stats.txt"));
 				}
 				
 				// close the connection.

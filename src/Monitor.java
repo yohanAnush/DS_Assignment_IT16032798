@@ -7,26 +7,19 @@ import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JTextArea;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.css.ElementCSSInlineStyle;
-import org.xml.sax.SAXException;
-
-import socket.FireSensorData;
 
 public class Monitor extends UnicastRemoteObject implements IListener {
 
+	// UI Properties.
+	JFrame frame = new JFrame();
+	JTextArea dataTxtArea = new JTextArea(10, 40);
+	JLabel statsLbl = new JLabel();
+	
+	
 	public Monitor() throws RemoteException {}
 	
 	public void onData(String sensorData) throws RemoteException {
@@ -46,7 +39,8 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 			
 			// we can now use addClient method in server to add ourself to the server.
 			rmiServer.addMonitor(new Monitor());
-		} catch (MalformedURLException | RemoteException | NotBoundException e) {
+		} 
+		catch (MalformedURLException | RemoteException | NotBoundException e) {
 			e.printStackTrace();
 		} 
 	}
