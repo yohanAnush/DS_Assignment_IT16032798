@@ -5,6 +5,7 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -20,6 +21,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+
+import authenticate.Authenticator;
 
 @SuppressWarnings("serial")
 public class RmiServer extends UnicastRemoteObject implements FireAlarmDataService, Runnable {
@@ -142,8 +145,7 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	}
 	
 	public void run() {
-		System.out.println("RMI Server started..");
-		
+
 		while(true) {
 			String data;
 			try {
@@ -167,9 +169,25 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 		
 	}
 	
-	public static void main(String [] args) throws RemoteException {
+	public static void main(String [] args) throws RemoteException, IOException {
 		
 		try {
+			// get key for authenticating the mointors.
+			System.out.println("Enter master authentication key(Use this key to authenticate each monitor).");
+			System.out.print("Key:");
+			
+			Scanner scanner = new Scanner(System.in);
+			String key = scanner.nextLine();
+			scanner.close();
+			
+			// we'll store the key as a hash and use that to authenticate monitors.
+			Authenticator authenticator = new Authenticator();
+			authenticator.setRmiServerAuthentication(key);
+			
+			System.out.println("Authentication key set, use the same key when starting monitors.");
+			System.out.println("Fire Alarm RMI server is up and running");
+			
+			// register ourself with the rmiregistry.
 			RmiServer rmiServer = new RmiServer();
 			String registration = "rmi://localhost/FireAlarmService";
 			

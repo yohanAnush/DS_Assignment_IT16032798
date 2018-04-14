@@ -168,7 +168,7 @@ public class FireSensorData implements Serializable{
 		// we must validate before getting the errors since errors will only be assigned after the values are validated.
 		validateAllParameters();
 		
-		String [] errors = {getTempErr(), getBatteryErr(), getSmokeErr(), getCo2Err(), getUnreportedErr()};
+		String [] errors = {getUnreportedErr(), getTempErr(), getBatteryErr(), getSmokeErr(), getCo2Err()};
 		
 		return errors;
 	}
@@ -194,11 +194,11 @@ public class FireSensorData implements Serializable{
 		
 		if (this.temperature < -273.15) {
 			validity = false;
-			setTempErr("Sensor is malfunctioning; A temperature of " + this.temperature + " celcius is below absolute zero.");
+			setTempErr(" Sensor is malfunctioning; A temperature of " + this.temperature + " celcius is below absolute zero. ");
 		}
 		else if (this.temperature > 50.0) {
 			validity = false;
-			setTempErr("Temperature is reaching a dangerous level at " + this.temperature + " celcius.");
+			setTempErr(" Temperature is reaching a dangerous level at " + this.temperature + " celcius. ");
 		}
 		
 		return validity;
@@ -213,12 +213,12 @@ public class FireSensorData implements Serializable{
 		setBatteryErr("");
 		if (this.batteryPercentage > 100 || this.batteryPercentage < 0) {
 			validity = false;
-			setBatteryErr("Battery malfunction.");
+			setBatteryErr(" Battery malfunction. ");
 		}
 		
 		else if (this.batteryPercentage <= 30) {
 			validity = false;
-			setBatteryErr("Battery low!");
+			setBatteryErr(" Battery low! ");
 		}
 
 		return validity;
@@ -233,12 +233,12 @@ public class FireSensorData implements Serializable{
 		setSmokeErr("");
 		
 		if (this.smokeLevel < 1 || this.smokeLevel > 10) {
-			setSmokeErr("Smoke sensor malfunction.");
+			setSmokeErr(" Smoke sensor malfunction. ");
 			validity = false;
 		}
 		
 		else if (this.smokeLevel > 7) {
-			setSmokeErr("Smoke level is at a dangerous level of " + this.smokeLevel);
+			setSmokeErr(" Smoke level is at a dangerous level of " + this.smokeLevel + " ");
 			validity = false;
 		}
 		
@@ -254,7 +254,7 @@ public class FireSensorData implements Serializable{
 		setCo2Err("");
 		
 		if (this.co2Level != 300.0) {
-			setCo2Err("CO2 level is at a dangerous level of " + this.co2Level);
+			setCo2Err(" CO2 level is at a dangerous level of " + this.co2Level + " ");
 			validity = false;
 		}
 		

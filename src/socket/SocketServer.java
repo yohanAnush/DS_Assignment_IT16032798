@@ -13,6 +13,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.rmi.RemoteException;
 import java.util.HashMap;
+import java.util.Scanner;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -26,6 +27,8 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
+
+import authenticate.Authenticator;
 
 
 /*
@@ -160,8 +163,23 @@ public class SocketServer implements Runnable {
 	 */
 	
 	public static void main(String[] args) throws IOException {
-		System.out.println("Fire Alarm Sensor is up and running");
 		
+		// get key for authenticating the sensors.
+		System.out.println("Enter master authentication key(Use this key to authenticate each sensor).");
+		System.out.print("Key:");
+		
+		Scanner scanner = new Scanner(System.in);
+		String key = scanner.nextLine();
+		scanner.close();
+		
+		// we'll store the key as a hash and use that to authenticate sensors.
+		Authenticator authenticator = new Authenticator();
+		authenticator.setSocketServerAuthentication(key);
+		
+		System.out.println("Authentication key set, use the same key when starting sensors.");
+		System.out.println("Fire Alarm Socket Server is up and running");
+		
+		// initiate socket operations.
 		ServerSocket portListner = new ServerSocket(PORT_TO_LISTEN);
 		
 		try {
@@ -356,16 +374,19 @@ public class SocketServer implements Runnable {
 					// 		local variable to avoid null pointers.
 					
 					// Monitors should be notified if the sensor's last update exceeds one hour.
-					// 1 hour = 3.6e+6 millis. 
-					if ((System.currentTimeMillis() - lastUpdate) > 600 && fsd != null) {
-						fsd.setUnreportedErr(sensorId + " has not reported in 1 hour.");
+					// 1 hour = 3.6e+6 millis = 3,600,000 millis. 
+					if ((System.currentTimeMillis() - lastUpdate) > 3600000 && fsd != null) {
+
+						fsd.setUnreportedErr("* * * " + sensorId + " has not reported in 1 hour. * * * ");
 						fsd.setAlreadyWrittenToFile(false);		// otherwise writting method will ignore the sensor.
 						writeSensorDataToXml(new File("./data.txt"), false);		// for rmi server to read latest data.
-						writeSensorDataToXml(new File("./current.txt"), true); 	// if the rmi server wants data of all the connected sensors.
+						writeSensorDataToXml(new File("./current.txt"), true); 	// in case the rmi server wants data of all the connected sensors.
 						
 						// Don't remove the following code as it will result in a non-stop loop until data arrives.
 						// Sending the warning once and then waiting another 1 hour will suffice.
 						lastUpdate = System.currentTimeMillis();
+						fsd.setAlreadyWrittenToFile(true);		// since writting is now over, we has to indicate that the data of this sensor is written,				
+																// otherwise the writting method in the below if condition will continenously write this sensor's data.
 					}
 					
 					if ( (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {

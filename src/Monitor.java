@@ -13,7 +13,10 @@ import java.rmi.server.UnicastRemoteObject;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JTextArea;
+
+import authenticate.Authenticator;
 
 @SuppressWarnings("serial")
 public class Monitor extends UnicastRemoteObject implements IListener {
@@ -83,6 +86,22 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 	public static void main(String [] args) {
 
 		try {
+			// authenticate with the RMI server.
+			// to do that, we'll use a dialogue box and ask for the key.
+			JFrame dialogueBoxFrame = new JFrame("Enter Authentication Key");
+			String key = JOptionPane.showInputDialog(dialogueBoxFrame, "Key:");
+			Authenticator authenticator = new Authenticator();
+			System.err.println(key);
+			if (!authenticator.authenticateMonitor(key)) {
+				System.err.println(key + "  closing");
+				return;
+			}
+			else {
+				dialogueBoxFrame.dispose();
+			}
+			// if the monitor can not be authenticated, we'll terminate it.
+			
+			
 			// find the FireAlarmService.
 			String remoteServiceAddress = "//localhost/FireAlarmService";
 			Remote remoteService = Naming.lookup(remoteServiceAddress);
