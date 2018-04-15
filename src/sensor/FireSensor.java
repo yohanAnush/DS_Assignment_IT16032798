@@ -52,7 +52,7 @@ public class FireSensor extends Sensor {
 			// all the consecutive writes will happen when the last update exceeds one hour compared to current time.
 			// write object method will take care of managing the last update time.
 												// to make sure data is sent once only 5 minutes (5 mins = 300,000 millis).
-			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 300000) {
+			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 3000/*300000*/) {
 				sensor.writeObject(data);
 			}
 		}

@@ -33,6 +33,8 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	
 	public int getSensorCount() throws RemoteException {
 
+		// when we call the following method with 2nd parameter being true(i.e: countSensors: true),
+		// readXmlData method will assign the sensor count after parsing the file.
 		readXmlData(new File("./current.txt"), true);
 		
 		return this.sensorCount;
@@ -83,9 +85,8 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	
 	
 	public String getAllReadings() throws RemoteException {
-		String data = readXmlData(new File("./data.txt"), false);
-		System.err.println(data);
-		
+		String data = readXmlData(new File("./current.txt"), false);
+
 		return data;
 	}
 	
@@ -103,8 +104,14 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 				document.getDocumentElement().normalize();
 				root = document.getDocumentElement();
 				
-				if (root.getAttribute("new_data").equals("yes")) {
-					root.setAttribute("new_data", "no");
+				if (root.getAttribute("new_data").equals("yes") || dataFile.getPath().equals("./current.txt")) {
+					
+					// this way no matter how much we read the current.txt file, its new_data attribute will stay "yes",
+					// which will lead the xml writing method in socket server to keep appending new readings; which is,
+					// what we expect since current.txt is supposed to keep every reading that came to the socket server.
+					if (!dataFile.getPath().equals("./current.txt")) {
+						root.setAttribute("new_data", "no");
+					}
 					
 					NodeList nodes = document.getElementsByTagName("sensor");
 					for (int i = 0; i < nodes.getLength(); i++) {
@@ -163,7 +170,7 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 					// we get the sensor count by reading current.txt where the reading method assigns the count.
 					readXmlData(new File("./current.txt"), true);
 					notifyMonitors(Integer.toString(this.sensorCount), "sensor_count");
-					notifyMonitors(Integer.toString(monitors.size()), "monitor_count");
+					notifyMonitors(Integer.toString(getMonitorCount()), "monitor_count");
 				}
 			}
 			catch (RemoteException e) {

@@ -1,4 +1,9 @@
 import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -14,6 +19,7 @@ import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 import authenticate.Authenticator;
@@ -24,8 +30,8 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 	// GUI properties.
 	JFrame frame = new JFrame();
 	JLabel statsLbl = new JLabel();
-	JTextArea dataTxtArea = new JTextArea(8, 40);
-	JButton refreshBtn = new JButton("Refresh");
+	JTextArea dataTxtArea = new JTextArea(10, 80);
+	JButton refreshBtn = new JButton("Get latest readings(All sensors)");
 
 	// Monitor properties.
 	int currentMonitorCount = 0;
@@ -36,10 +42,15 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 	public Monitor() throws RemoteException {
 		
 		// initialize the GUI.
+		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+		Dimension d = new Dimension(800, 800);
 		dataTxtArea.setEditable(false);
+		frame.setMinimumSize(d);
+		
 		frame.getContentPane().add(statsLbl, BorderLayout.NORTH);
 		frame.getContentPane().add(refreshBtn, BorderLayout.SOUTH);
-		frame.getContentPane().add(dataTxtArea, BorderLayout.WEST);
+		frame.getContentPane().add(new JScrollPane(dataTxtArea), BorderLayout.WEST);
+		
 		frame.pack();
 	}
 	
@@ -139,7 +150,6 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 				public void actionPerformed(ActionEvent e) {
 					System.out.println("clicked!!");
 					try {
-						System.err.println(server.getAllReadings());
 						monitor.dataTxtArea.append(server.getAllReadings());
 					}
 					catch (RemoteException e1) {
