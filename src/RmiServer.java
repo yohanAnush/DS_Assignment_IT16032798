@@ -39,15 +39,21 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	}
 	
 	public int getMonitorCount() throws RemoteException {
-		return monitors.size();
+		synchronized (monitors) {
+			return monitors.size();
+		}
 	}
 	
 	public void addMonitor(IListener monitor) throws RemoteException {
-		monitors.add(monitor);
+		synchronized (monitors) {
+			monitors.add(monitor);
+		}
 	}
 	
 	public void removeMonitor(IListener monitor) throws RemoteException {
-		monitors.remove(monitor);
+		synchronized (monitors) {
+			monitors.remove(monitor);
+		}
 	}
 	
 	/*
