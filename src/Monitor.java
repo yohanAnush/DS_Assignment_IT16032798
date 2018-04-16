@@ -1,9 +1,5 @@
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
-import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -42,8 +38,8 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 	public Monitor() throws RemoteException {
 		
 		// initialize the GUI.
-		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 		Dimension d = new Dimension(800, 800);
+		
 		dataTxtArea.setEditable(false);
 		frame.setMinimumSize(d);
 		

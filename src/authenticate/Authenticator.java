@@ -1,10 +1,9 @@
 package authenticate;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+
+import file.FileIO;
 
 /*
  * This class will server as a helper class to authenticate sensors, monitors with their,
@@ -15,35 +14,28 @@ import java.io.IOException;
  */
 public class Authenticator {
 	
+	private FileIO fileManager = new FileIO();
 	private File socketAuthenFile = new File("./sockAuthen.txt");
 	private File rmiAuthenFile = new File("./rmiAuthen.txt");
 
 	public void setSocketServerAuthentication(String key) throws IOException {
-		FileWriter writer = new FileWriter(socketAuthenFile);
-		writer.write(Integer.toString(key.hashCode()));		// always convert to a string or otherwise some invalid character will be written.
-		writer.close();
+		// we should always overwrite the file so that there will only be one master key stored in the file.
+		fileManager.writeToFile(Integer.toString(key.hashCode()), socketAuthenFile, false);
 	}
 	
 	public void setRmiServerAuthentication(String key) throws IOException {
-		FileWriter writer = new FileWriter(rmiAuthenFile);
-		writer.write(Integer.toString(key.hashCode()));		// always convert to a string or otherwise some invalid character will be written.
-		writer.close();
+		// we should always overwrite the file so that there will only be one master key stored in the file.
+		fileManager.writeToFile(Integer.toString(key.hashCode()), rmiAuthenFile, false);
 	}
 	
 	public boolean authenticateSensor(String input) {
 		boolean result = false;
 		
-		try {
-			BufferedReader reader = new BufferedReader(new FileReader(socketAuthenFile));
-			String line = reader.readLine();
-			reader.close();
+		// get the hash code of the master key.
+		String masterKeyHash = fileManager.readFile(socketAuthenFile);
 			
-			if (line != null) {
-				result = Integer.parseInt(line) == input.hashCode();
-			}
-		}
-		catch (IOException e) {
-			System.err.println("Socket authentication key is not set!");
+		if (masterKeyHash != null) {
+			result = Integer.parseInt(masterKeyHash) == input.hashCode();
 		}
 		
 		return result;
@@ -52,17 +44,11 @@ public class Authenticator {
 	public boolean authenticateMonitor(String input) {
 		boolean result = false;
 		
-		try {
-			BufferedReader reader = new BufferedReader(new FileReader(rmiAuthenFile));
-			String line = reader.readLine();
-			reader.close();
+		// get the hash code of the master key.
+		String masterKeyHash = fileManager.readFile(rmiAuthenFile);
 			
-			if (line != null) {
-				result = Integer.parseInt(line) == input.hashCode();
-			}
-		}
-		catch (IOException e) {
-			System.err.println("RMI authentication key is not set!");
+		if (masterKeyHash != null) {
+			result = Integer.parseInt(masterKeyHash) == input.hashCode();
 		}
 		
 		return result;

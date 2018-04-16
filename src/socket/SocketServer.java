@@ -2,8 +2,6 @@ package socket;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
@@ -15,20 +13,8 @@ import java.rmi.RemoteException;
 import java.util.HashMap;
 import java.util.Scanner;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.xml.sax.SAXException;
-
 import authenticate.Authenticator;
+import file.FileIO;
 
 
 /*
@@ -62,6 +48,7 @@ public class SocketServer implements Runnable {
 	private Socket socket;
 	@SuppressWarnings("unused")
 	private BufferedReader sensorTextInput;
+	private PrintWriter serverTextOutput;
 	private ObjectInputStream sensorDataInput;	// this will delivery a hash map where a key can be 1 of the 4 parameters.
 											// and the value relevent to the parameter is the object assigned to the key.
 											// both the key and the object/value are Strings (Parse as needed).
@@ -74,9 +61,11 @@ public class SocketServer implements Runnable {
 	private ObjectOutputStream serverDataOutput;
 
 	// File I/O properties.
-	File dataFile = new File("./data.xml");
-	BufferedReader reader;
-	PrintWriter writer;
+	FileIO fileManager = new FileIO();
+	File latestDataFile = new File("./data.txt");
+	File allCurrentReadingsFile = new File("./current.txt");
+	File sensorCountFile = new File("./s_count.txt");
+	
 	
 	// Socket Connection implementations.
 	/*
@@ -89,20 +78,12 @@ public class SocketServer implements Runnable {
 			this.serverDataOutput = new ObjectOutputStream(this.socket.getOutputStream());
 			this.sensorTextInput =  new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 			this.sensorDataInput = new ObjectInputStream(this.socket.getInputStream());
+			this.serverTextOutput = new PrintWriter(this.socket.getOutputStream(), true);
 		} 
 		catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}	// must be initialized before input stream.
-		
-		// initiate file stream.
-		try {
-			writer = new PrintWriter(dataFile);
-			reader = new BufferedReader(new FileReader(dataFile));
-		}
-		catch (FileNotFoundException e) {
-			e.printStackTrace();
-		}
 	}
 	
 	/*
@@ -210,125 +191,24 @@ public class SocketServer implements Runnable {
 			// new data and write to the file.
 			fireSensorData.setAlreadyWrittenToFile(false);
 			sensorAndData.put(sensorId, fireSensorData);
+			
+			// finally we update the sensor count.
+			updateSensorCount();
 		}
-		
 	}
 
-		
 	/*
-	 * This method is kinda tricky,even though we iterate through the whole HashMap that contains,
-	 * data from all the sensors, we skip the sensors whose data has previously being written and there,
-	 * has not been any update since the last write.
-	 * 
-	 * But, we need to able to provide the data of all the sensors if the RMI server requires so. 
+	 * Every time a sensor is connected/disconnected we need to update the sensor count,
+	 * and write to a file so the RMI server can use that data.
 	 */
-	public void writeSensorDataToXml(File dataFile, boolean coverAllSensors) throws ParserConfigurationException {
-		// we use data.txt file to write/append new data,
-		// and current.txt file to write all the data of all the sensors.
-		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		DocumentBuilder builder = factory.newDocumentBuilder();
-		Document document;
-		Element root;
-	
-		
-		if (dataFile.exists()) {
-			// RMI server will set new_data attribute of the root element to "no" after reading.
-			// and to tell the RMI server that it should read data, Socket server(here) will set it to "yes".
-			try {
-				document = builder.parse(dataFile);
-				root = document.getDocumentElement();
-				
-				// if we are to cover all the sensors, we might as well overwrite the existing file anyways.
-				if (root.getAttribute("new_data").equals("no") || coverAllSensors) {
-					// we can safely overwrite the file.
-					document = builder.newDocument();
-					root = document.createElement("sensors");
-					root.setAttribute("new_data", "yes");
-					document.appendChild(root);
-				}
-			} catch (SAXException | IOException e) {
-				e.printStackTrace();
-				// if parsing fails, make a new file.
-				document = builder.newDocument();
-				root = document.createElement("sensors");
-				root.setAttribute("new_data", "yes");
-				document.appendChild(root);
-			}
+	public void updateSensorCount() {
+
+		// we must always overwrite the file so there's only one count.
+		synchronized (sensorAndData) {
+			fileManager.writeToFile(Integer.toString(sensorAndData.keySet().size()), sensorCountFile, false);
+			System.out.println(sensorAndData.size());
 		}
-		else {
-			// since the file isn't there already, we can create a new file and add new data.
-			document = builder.newDocument();
-			root = document.createElement("sensors");
-			root.setAttribute("new_data", "yes");
-			document.appendChild(root);
-		}
-		
-		
-		// since we are writing new data anyway..
-		
-		// adding elements.
-		// sensors.
-		for(FireSensorData fsd: sensorAndData.values()) {
-			// see if the data has already been written.
-			// TODO check if we are supposed to cover all the sensors, in which case we don't check if the data,
-			//		is already written or not.
-			if (coverAllSensors || !fsd.alreadyWrittenToFile()) {
-				// sensor is a child of sensors.
-				Element sensor = document.createElement("sensor");
-				root.appendChild(sensor);
-				
-				// set sensor id.
-				sensor.setAttribute("id", fsd.getSensorId());	// <sensor id="23-13">
-				
-				// set other 4 params.
-				// they are children of the sensor.
-				HashMap<String, String> dataHashMap = fsd.getParamHashMap();	// this way we can iterate instead of coding for each paramter.
-				for (String param: dataHashMap.keySet()) {
-					Element paramElement = document.createElement(param);
-					paramElement.appendChild(document.createTextNode(dataHashMap.get(param)));		// <temperature>43.4</temperature>
-					sensor.appendChild(paramElement);		// because temperature is a child of sensor.
-				}
-				
-				// errors.
-				// All the errors tags(i.e: 4, one for each param) must be there,
-				// even if there is no error for that param.
-				// Otherwise down the line if we get a new error, XML Parser wont let us,
-				// add the error due to HIERARCHY_REQUEST_ERR.
-				Element errors = document.createElement("errors");
-				sensor.appendChild(errors);
-				
-				// error of each parameter of fire sensor is a child of errors.
-				fsd.validateAllParameters();
-				for (String error: fsd.getSensorErrors()) {
-					Element errorElement = document.createElement("error");
-					errorElement.appendChild(document.createTextNode(error));
-					errors.appendChild(errorElement);
-				}
-				
-				// if we are not covering all the sensors we need to mark the data as already written.
-				if (!coverAllSensors) {
-					fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.
-				}
-			}
-		}
-		
-		// write the data to .xml file.
-		try {
-			TransformerFactory transformerFactory = TransformerFactory.newInstance();
-			Transformer transformer = transformerFactory.newTransformer();
-			DOMSource source = new DOMSource(document);
-			StreamResult target = new StreamResult(dataFile);
-			
-			transformer.transform(source, target);
-		} catch (TransformerException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		
 	}
-	
-	
 	
 	/*
 	 * Thread for each sensor.
@@ -341,84 +221,97 @@ public class SocketServer implements Runnable {
 	private long lastUpdate;	// using Time() we can get the difference easily.
 	
 	
-	public SocketServer(Socket sensorSocket) throws RemoteException {
+	public SocketServer(Socket sensorSocket) {
 		this.socket = sensorSocket;
 	}
 	
-	public SocketServer() {
-	}
+	public SocketServer() {}
 		
 		
 		
-		/*
-		 * run method of the Thread class.
-		 * Listens to the sensor and accepts the hashmap sent.
-		 * Parse the content of the hashmap as needed by the FireSensorHelper class,
-		 * TODO And determine if the monitors should be notified or not.
-		 * TODO Send alert to the sensors to turn the alarm on.
-		 * 
-		 * Monitors should be notified if the sensor does not report back after an hour.
-		 */
-		@SuppressWarnings("unchecked")
-		public void run() {
-			try {
-				initSocketConnection(socket);
+	/*
+	* run method of the Thread class.
+	* Listens to the sensor and accepts the hashmap sent.
+	* Parse the content of the hashmap as needed by the FireSensorHelper class,
+	* TODO And determine if the monitors should be notified or not.
+	* TODO Send alert to the sensors to turn the alarm on.
+	* 
+	* Monitors should be notified if the sensor does not report back after an hour.
+	*/
+	@SuppressWarnings("unchecked")
+	public void run() {
+		try {
+			initSocketConnection(socket);
 				
-				HashMap<String, String> sensorDataAsHashMap;
-				FireSensorData fsd = null;
-				String sensorId = "Unassigned Sensor Id";
-				lastUpdate = System.currentTimeMillis();
-				
-				while (true) {
-					// TODO Always get the text input and data input of the sensor into a,
-					// 		local variable to avoid null pointers.
-					
-					// Monitors should be notified if the sensor's last update exceeds one hour.
-					// 1 hour = 3.6e+6 millis = 3,600,000 millis. 
-					if ((System.currentTimeMillis() - lastUpdate) > 3600000 && fsd != null) {
-
-						fsd.setUnreportedErr("* * * " + sensorId + " has not reported in 1 hour. * * * ");
-						fsd.setAlreadyWrittenToFile(false);		// otherwise writting method will ignore the sensor.
-						writeSensorDataToXml(new File("./data.txt"), false);		// for rmi server to read latest data.
-						writeSensorDataToXml(new File("./current.txt"), true); 	// in case the rmi server wants data of all the connected sensors.
-						
-						// Don't remove the following code as it will result in a non-stop loop until data arrives.
-						// Sending the warning once and then waiting another 1 hour will suffice.
-						lastUpdate = System.currentTimeMillis();
-						fsd.setAlreadyWrittenToFile(true);		// since writting is now over, we has to indicate that the data of this sensor is written,				
-																// otherwise the writting method in the below if condition will continenously write this sensor's data.
-					}
-					
-					if ( (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {
-						fsd = new FireSensorData(sensorDataAsHashMap);
-						sensorId = fsd.getSensorId();
-						
-						fsd.printData();	
-						insertDataToServerHashMap(sensorId, fsd);
-						writeSensorDataToXml(new File("./data.txt"), false);		// for rmi server to read latest data.
-						writeSensorDataToXml(new File("./current.txt"), true); 	// if the rmi server wants data of all the connected sensors.
-						
-						// coming upto this points indicates that the sensor sent data,
-						// hence we can set the last update to the current time.
-						lastUpdate = System.currentTimeMillis();
-					}
-					
-					
-				}
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}	
-			finally {
-				// sensor disconnecting from the server.
-				// therefore remove the sensor and its data.
-				if (sensorId != null) {
-					sensorAndData.remove(sensorId);
-				}
-				
-				// close the connection.
+			HashMap<String, String> sensorDataAsHashMap;
+			FireSensorData fsd = null;
+			String sensorId = "Unassigned Sensor Id";
+			lastUpdate = System.currentTimeMillis();
+			
+			// authenticate the server.
+			// the first and only text the sensor will send is the password.
+			String password = sensorTextInput.readLine();
+			Authenticator authenticator = new Authenticator();
+			
+			if (password != null && !authenticator.authenticateSensor(password)) {
+				serverTextOutput.println("Authentication failed, disconnecting....");
 				closeSocket();
 			}
+			else {
+				serverTextOutput.println("Authenticated successfully.");
+			}
+			
+			while (socket != null) {
+				// TODO Always get the text input and data input of the sensor into a,
+				// 		local variable to avoid null pointers.
+					
+				// Monitors should be notified if the sensor's last update exceeds one hour.
+				// 1 hour = 3.6e+6 millis = 3,600,000 millis. 
+				if ((System.currentTimeMillis() - lastUpdate) > 3600000 && fsd != null) {
+
+					fsd.setUnreportedErr("* * * " + sensorId + " has not reported in 1 hour. * * * ");
+						
+					fsd.setAlreadyWrittenToFile(false);		// otherwise writting method will ignore the sensor.
+					fileManager.writeSensorDataToXml(sensorAndData, new File("./data.txt"));		// for rmi server to read latest data.
+					fileManager.writeSensorDataToXml(sensorAndData, new File("./current.txt")); 	// in case the rmi server wants data of all the connected sensors.
+						
+					// Don't remove the following code as it will result in a non-stop loop until data arrives.
+					// Sending the warning once and then waiting another 1 hour will suffice.
+					lastUpdate = System.currentTimeMillis();
+					fsd.setAlreadyWrittenToFile(true);		// since writting is now over, we has to indicate that the data of this sensor is written,				
+																// otherwise the writting method in the below if condition will continenously write this sensor's data.
+				}
+					
+				if ( (sensorDataAsHashMap = (HashMap<String, String>) readSocketData()) != null) {
+					fsd = new FireSensorData(sensorDataAsHashMap);
+					sensorId = fsd.getSensorId();
+						
+					fsd.printData();	
+					insertDataToServerHashMap(sensorId, fsd);
+					fileManager.writeSensorDataToXml(sensorAndData, new File("./data.txt"));		// for rmi server to read latest data.
+					fileManager.writeSensorDataToXml(sensorAndData, new File("./current.txt")); 	// if the rmi server wants data of all the connected sensors.
+						
+					// coming upto this points indicates that the sensor sent data,
+					// hence we can set the last update to the current time.
+					lastUpdate = System.currentTimeMillis();
+				}	
+			}
+			
+		} 
+		catch (Exception e) {
+			e.printStackTrace();
+		}	
+		finally {
+			// sensor disconnecting from the server.
+			// therefore remove the sensor and its data.
+			synchronized (sensorAndData) {
+				sensorAndData.remove(sensorId);	
+				
+				// we have to update the sensor count since we have removed a sensor.
+				updateSensorCount();
+				// close the connection.
+				closeSocket();
+			}	
 		}
-	
+	}
 }

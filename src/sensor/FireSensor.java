@@ -10,6 +10,10 @@ public class FireSensor extends Sensor {
 	// TODO mimic the procedure of the sensor getting data by using a file.
 	public static void main(String[] main) throws InterruptedException {
 		
+		FireSensor sensor = new FireSensor();
+		
+		sensor.connectToServer("localhost", 9001);
+		
 		// we need to authenticate the sensor with the server.
 		// the key that should be provided by the sensor has to be the same key that we used,
 		// when the server was started.
@@ -19,24 +23,17 @@ public class FireSensor extends Sensor {
 		scanner.close();
 		
 		// now we need to check if this key matches the hash of the server's key.
-		Authenticator authenticator = new Authenticator();
-		
-		if (authenticator.authenticateSensor(key)) {
-			System.out.println("Authenticated successfully; connection established.");
+		String serverResponse;
+		sensor.writeText(key);
+		if ((serverResponse = sensor.readText()) != null) {
+			System.out.println(serverResponse);
 		}
-		else {
-			System.out.println("Authentication failed. Please check your key and re-run the sensor.");
-			return;
-		}
-		
-		
-		FireSensor sensor = new FireSensor();
+			
 		Randoms random = new Randoms();
 		String sensorId = random.getRandomInt(1, 23) + "-" + random.getRandomInt(1, 13);		// we assume there are 23 floors and 13 sensors per floor.
 		HashMap<String, String> data;
 		
-		sensor.connectToServer("localhost", 9001);
-
+		
 		while (sensor.isConnected()) {	
 			// always reinitialize the hash map or same data will be sent to the server always.
 			data = new HashMap<>();
@@ -55,6 +52,7 @@ public class FireSensor extends Sensor {
 			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 3000/*300000*/) {
 				sensor.writeObject(data);
 			}
+			break;
 		}
 	}
 }
