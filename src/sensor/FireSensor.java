@@ -52,7 +52,6 @@ public class FireSensor extends Sensor {
 			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 3000/*300000*/) {
 				sensor.writeObject(data);
 			}
-			break;
 		}
 	}
 }

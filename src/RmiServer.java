@@ -14,7 +14,7 @@ import file.FileIO;
 public class RmiServer extends UnicastRemoteObject implements FireAlarmDataService, Runnable {
 
 	private int sensorCount = 0;	// we can get this simply by counting nodes in the XML file(given that we are reading the current.txt file).
-	private static ArrayList<IListener> monitors = new ArrayList<>();
+	private static ArrayList<IListener> monitors = new ArrayList<>();	// TODO any operation on this must be always synchronized.
 	private FileIO fileManager = new FileIO();
 	private File monitorCountFile = new File("./m_count.txt");
 	private File sensorCountFile = new File("./s_count.txt");
@@ -112,17 +112,21 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	 */
 	public void notifyMonitors(String data, String dataType) throws RemoteException {
 		
-		for(IListener monitor: monitors) {
-			switch (dataType) {
-			case "data":	monitor.onData(data);
-						    break;
-						    
-			case "monitor_count":	monitor.onMonitorChange(Integer.parseInt(data));
-									break;
-									
-			case "sensor_count":	monitor.onSensorChnange(Integer.parseInt(data));
-									break;
-				
+		// if we don't synchronize the monitors array list, we will get a concurrent modification exception,
+		// when this method is going through the monitors(iterating) while a new monitor joins.
+		synchronized (monitors) {
+			for(IListener monitor: monitors) {
+				switch (dataType) {
+				case "data":	monitor.onData(data);
+							    break;
+							    
+				case "monitor_count":	monitor.onMonitorChange(Integer.parseInt(data));
+										break;
+										
+				case "sensor_count":	monitor.onSensorChnange(Integer.parseInt(data));
+										break;
+					
+				}
 			}
 		}
 	}
