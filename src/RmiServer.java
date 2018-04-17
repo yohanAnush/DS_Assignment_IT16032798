@@ -70,12 +70,14 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 			synchronized (monitors) {
 				monitors.add(monitor);
 				
+				// since a monitor is added, we need to let all connected monitors(included this one that we just added) know.
 				updateMonitorCount();
 				notifyMonitors(Integer.toString(getMonitorCount()), "monitor_count");
 			}
 		}
 		else {
 			// tell the monitor the key is wrong.
+			// and since we haven't added it to the list, it won't receive anymore data from the server.
 			monitor.onData("Invalid key; make sure you provide the same key as the one given for the RMI server.");
 		}
 		
@@ -93,6 +95,7 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 		synchronized (monitors) {
 			monitors.remove(monitor);
 	
+			// since a monitor is removed, we need to let other monitors know.
 			updateMonitorCount();
 			notifyMonitors(Integer.toString(getMonitorCount()), "monitor_count");
 		}
