@@ -55,16 +55,31 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	 * Apart from adding a monitor to the server's monitor list, we need to notify,
 	 * all the other connected monitors about the new monitor count.
 	 * 
+	 * Additionally we ask for a key to authenticate the monitor.
+	 * This key should be as same as the one we gave when the RMI server was started.
+	 * 
 	 * (non-Javadoc)
 	 * @see FireAlarmDataService#addMonitor(IListener)
 	 */
-	public void addMonitor(IListener monitor) throws RemoteException {
-		synchronized (monitors) {
-			monitors.add(monitor);
-			
-			updateMonitorCount();
-			notifyMonitors(Integer.toString(getMonitorCount()), "monitor_count");
+	public void addMonitor(IListener monitor, String key) throws RemoteException {
+		
+		Authenticator authenticator = new Authenticator();
+		
+		// we add the monitor only if the key is correct.
+		if (authenticator.authenticateMonitor(key)) {
+			synchronized (monitors) {
+				monitors.add(monitor);
+				
+				updateMonitorCount();
+				notifyMonitors(Integer.toString(getMonitorCount()), "monitor_count");
+			}
 		}
+		else {
+			// tell the monitor the key is wrong.
+			monitor.onData("Invalid key; make sure you provide the same key as the one given for the RMI server.");
+		}
+		
+		
 	}
 	
 	/*
@@ -81,6 +96,10 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 			updateMonitorCount();
 			notifyMonitors(Integer.toString(getMonitorCount()), "monitor_count");
 		}
+	}
+	
+	public void login(String key) throws RemoteException {
+		
 	}
 	
 	/*

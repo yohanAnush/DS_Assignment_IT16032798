@@ -93,31 +93,18 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 	public static void main(String [] args) {
 
 		try {
-			// authenticate with the RMI server.
-			// to do that, we'll use a dialogue box and ask for the key.
-			JFrame dialogueBoxFrame = new JFrame("Enter Authentication Key");
-			String key = JOptionPane.showInputDialog(dialogueBoxFrame, "Key:");
-			Authenticator authenticator = new Authenticator();
-			System.err.println(key);
-			if (!authenticator.authenticateMonitor(key)) {
-				System.err.println(key + "  closing");
-				return;
-			}
-			else {
-				dialogueBoxFrame.dispose();
-			}
-			// if the monitor can not be authenticated, we'll terminate it.
-			
-			
 			// find the FireAlarmService.
 			String remoteServiceAddress = "//localhost/FireAlarmService";
 			Remote remoteService = Naming.lookup(remoteServiceAddress);
 			server = (FireAlarmDataService)remoteService;
-			
-			// we can now use addClient method in server to add ourself to the server.
-			// gui is also deployed.
+						
+									
+			// authenticate with the RMI server.
+			// to do that, we'll use a dialogue box and ask for the key.
+			JFrame dialogueBoxFrame = new JFrame("Enter Authentication Key");
+			String key = JOptionPane.showInputDialog(dialogueBoxFrame, "Key:");
 			Monitor monitor = new Monitor();
-			server.addMonitor(monitor);
+			server.addMonitor(monitor, key);
 			
 			// update the ui with details taken from the server.
 			monitor.currentMonitorCount = server.getMonitorCount();
