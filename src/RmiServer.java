@@ -10,6 +10,7 @@ import java.util.Scanner;
 import authenticate.Authenticator;
 import file.FileIO;
 
+
 @SuppressWarnings("serial")
 public class RmiServer extends UnicastRemoteObject implements FireAlarmDataService, Runnable {
 

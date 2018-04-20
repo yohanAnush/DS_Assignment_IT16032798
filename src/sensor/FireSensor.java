@@ -47,10 +47,15 @@ public class FireSensor extends SocketSensor {
 			// 0 indicates the sensor never wrote to the server, so we have to do an initial write.
 			// all the consecutive writes will happen when the last update exceeds one hour compared to current time.
 			// write object method will take care of managing the last update time.
-												// to make sure data is sent once only 5 minutes (5 mins = 300,000 millis).
-			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 300000) {
+												// to make sure data is sent once only 1 hour (60 mins = 3,600,000 millis).
+			if (sensor.getLastUpdate() == 0 || (System.currentTimeMillis() - sensor.getLastUpdate()) > 3600000) {
 				sensor.writeObject(data);
 			}
+			
+			// we only have to emulate taking readings once every 5 mins.
+			// 5 mins = 300,000 milliseconds.
+			new Thread();
+			Thread.sleep(300000);
 		}
 	}
 }
