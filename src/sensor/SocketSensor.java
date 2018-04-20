@@ -10,7 +10,7 @@ import java.net.SocketException;
 import java.util.HashMap;
 import java.net.Socket;
 
-public class Sensor {
+public class SocketSensor {
 	
 	private Socket socket;
 	private ObjectOutputStream sensorDataOutput;

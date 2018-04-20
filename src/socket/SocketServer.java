@@ -9,7 +9,6 @@ import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.rmi.RemoteException;
 import java.util.HashMap;
 import java.util.Scanner;
 
@@ -272,8 +271,8 @@ public class SocketServer implements Runnable {
 					fsd.setUnreportedErr("* * * " + sensorId + " has not reported in 1 hour. * * * ");
 						
 					fsd.setAlreadyWrittenToFile(false);		// otherwise writting method will ignore the sensor.
-					fileManager.writeSensorDataToXml(sensorAndData, new File("./data.txt"));		// for rmi server to read latest data.
-					fileManager.writeSensorDataToXml(sensorAndData, new File("./current.txt")); 	// in case the rmi server wants data of all the connected sensors.
+					fileManager.writeSensorDataToXml(sensorAndData, false, new File("./data.txt"));		// for rmi server to read latest data.
+					fileManager.writeSensorDataToXml(sensorAndData, true, new File("./current.txt")); 	// in case the rmi server wants data of all the connected sensors.
 						
 					// Don't remove the following code as it will result in a non-stop loop until data arrives.
 					// Sending the warning once and then waiting another 1 hour will suffice.
@@ -288,8 +287,8 @@ public class SocketServer implements Runnable {
 						
 					fsd.printData();	
 					insertDataToServerHashMap(sensorId, fsd);
-					fileManager.writeSensorDataToXml(sensorAndData, new File("./data.txt"));		// for rmi server to read latest data.
-					fileManager.writeSensorDataToXml(sensorAndData, new File("./current.txt")); 	// if the rmi server wants data of all the connected sensors.
+					fileManager.writeSensorDataToXml(sensorAndData, false, new File("./data.txt"));		// for rmi server to read latest data.
+					fileManager.writeSensorDataToXml(sensorAndData, true, new File("./current.txt")); 	// if the rmi server wants data of all the connected sensors.
 						
 					// coming upto this points indicates that the sensor sent data,
 					// hence we can set the last update to the current time.

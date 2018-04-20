@@ -14,10 +14,15 @@ import file.FileIO;
  */
 public class Authenticator {
 	
+	// Authenticator properties.
 	private FileIO fileManager = new FileIO();
 	private File socketAuthenFile = new File("./sockAuthen.txt");
 	private File rmiAuthenFile = new File("./rmiAuthen.txt");
 
+	
+	/*
+	 * Implementation.
+	 */
 	public void setSocketServerAuthentication(String key) throws IOException {
 		// we should always overwrite the file so that there will only be one master key stored in the file.
 		fileManager.writeToFile(Integer.toString(key.hashCode()), socketAuthenFile, false);

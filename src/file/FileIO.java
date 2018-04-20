@@ -2,11 +2,9 @@ package file;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.HashMap;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -78,7 +76,7 @@ public class FileIO {
 	 * 
 	 * But, we need to able to provide the data of all the sensors if the RMI server requires so. 
 	 */
-	public void writeSensorDataToXml(HashMap<String, FireSensorData> sensorAndData, File dataFile) throws ParserConfigurationException  {
+	public void writeSensorDataToXml(HashMap<String, FireSensorData> sensorAndData, boolean coverFullHashMap, File dataFile) throws ParserConfigurationException  {
 		// we use data.txt file to write/append new data,
 		// and current.txt file to write all the data of all the sensors.
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -128,7 +126,7 @@ public class FileIO {
 			// see if the data has already been written.
 			// TODO check if we are supposed to cover all the sensors, in which case we don't check if the data,
 			//		is already written or not.
-			if (!fsd.alreadyWrittenToFile()) {
+			if (coverFullHashMap || !fsd.alreadyWrittenToFile()) {
 				// sensor is a child of sensors.
 				Element sensor = document.createElement("sensor");
 				root.appendChild(sensor);
@@ -161,7 +159,13 @@ public class FileIO {
 					errors.appendChild(errorElement);
 				}
 				
-				fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.}
+				// usually we indicate that this specific data has already been written to a file,
+				// so that it won't be written again unless it has been updated.
+				// but covering the full hashmap is not our standard way and most of the time, we use,
+				// a separate file to write when we cover the full hashmap so no need to alter the alreadyWritten status.
+				if (!coverFullHashMap) {
+					fsd.setAlreadyWrittenToFile(true); 	// to avoid duplication of data.
+				}
 			}
 		}
 		

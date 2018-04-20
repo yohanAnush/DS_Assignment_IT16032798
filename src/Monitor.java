@@ -18,16 +18,15 @@ import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
-import authenticate.Authenticator;
 
 @SuppressWarnings("serial")
-public class Monitor extends UnicastRemoteObject implements IListener {
+public class Monitor extends UnicastRemoteObject implements FireAlarmMonitor {
 
 	// GUI properties.
 	JFrame frame = new JFrame();
 	JLabel statsLbl = new JLabel();
 	JTextArea dataTxtArea = new JTextArea(10, 80);
-	JButton refreshBtn = new JButton("Get latest readings(All sensors)");
+	JButton refreshBtn = new JButton("Get History of Readings");
 
 	// Monitor properties.
 	int currentMonitorCount = 0;
@@ -131,7 +130,7 @@ public class Monitor extends UnicastRemoteObject implements IListener {
 				
 				@Override
 				public void actionPerformed(ActionEvent e) {
-					System.out.println("clicked!!");
+					
 					try {
 						monitor.dataTxtArea.append(server.getAllReadings());
 					}

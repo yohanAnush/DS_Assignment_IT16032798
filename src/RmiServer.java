@@ -13,15 +13,22 @@ import file.FileIO;
 @SuppressWarnings("serial")
 public class RmiServer extends UnicastRemoteObject implements FireAlarmDataService, Runnable {
 
-	private int sensorCount = 0;	// we can get this simply by counting nodes in the XML file(given that we are reading the current.txt file).
-	private static ArrayList<IListener> monitors = new ArrayList<>();	// TODO any operation on this must be always synchronized.
+	private static ArrayList<FireAlarmMonitor> monitors = new ArrayList<>();	// TODO any operation on this must be always synchronized.
 	private FileIO fileManager = new FileIO();
 	private File monitorCountFile = new File("./m_count.txt");
 	private File sensorCountFile = new File("./s_count.txt");
 	
 	
+	// only reason we declare this constructor is because the remote object should be able to,
+	// throw a RemoteException upon creation if need be.
 	public RmiServer() throws RemoteException {}
 	
+	/*
+	 * Socket server writes its sensor count to a file so the RMI server can read it.
+	 * 
+	 * (non-Javadoc)
+	 * @see FireAlarmDataService#getSensorCount()
+	 */
 	public int getSensorCount() throws RemoteException {
 
 		int count;
@@ -37,17 +44,19 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 		
 	}
 	
+	/*
+	 * Since we have the monitors list, we can directly get the count from it.
+	 * 
+	 * (non-Javadoc)
+	 * @see FireAlarmDataService#getMonitorCount()
+	 */
 	public int getMonitorCount() throws RemoteException {
-		int count;
 		
-		try {
-			count = Integer.parseInt(fileManager.readFile(monitorCountFile));
+		// we have to synchronize the monitors list so that a monitor is not added/removed,
+		// while we are getting the count.
+		synchronized (monitors) {
+			return monitors.size();
 		}
-		catch (NumberFormatException e) {
-			count = -1;
-		}
-		
-		return count;
 		
 	}
 	
@@ -61,7 +70,7 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	 * (non-Javadoc)
 	 * @see FireAlarmDataService#addMonitor(IListener)
 	 */
-	public void addMonitor(IListener monitor, String key) throws RemoteException {
+	public void addMonitor(FireAlarmMonitor monitor, String key) throws RemoteException {
 		
 		Authenticator authenticator = new Authenticator();
 		
@@ -91,7 +100,7 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 	 * (non-Javadoc)
 	 * @see FireAlarmDataService#removeMonitor(IListener)
 	 */
-	public void removeMonitor(IListener monitor) throws RemoteException {
+	public void removeMonitor(FireAlarmMonitor monitor) throws RemoteException {
 		synchronized (monitors) {
 			monitors.remove(monitor);
 	
@@ -118,7 +127,7 @@ public class RmiServer extends UnicastRemoteObject implements FireAlarmDataServi
 		// if we don't synchronize the monitors array list, we will get a concurrent modification exception,
 		// when this method is going through the monitors(iterating) while a new monitor joins.
 		synchronized (monitors) {
-			for(IListener monitor: monitors) {
+			for(FireAlarmMonitor monitor: monitors) {
 				switch (dataType) {
 				case "data":	monitor.onData(data);
 							    break;
